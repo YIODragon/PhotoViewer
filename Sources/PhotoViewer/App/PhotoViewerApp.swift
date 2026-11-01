@@ -87,6 +87,11 @@ struct PhotoViewerApp: App {
                 }
                 .keyboardShortcut("n", modifiers: [])
 
+                Button("折叠/展开胶片条") {
+                    appState.browser.toggleFilmstrip()
+                }
+                .keyboardShortcut("t", modifiers: [])
+
                 Divider()
 
                 Button("放大") {

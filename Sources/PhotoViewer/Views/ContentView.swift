@@ -25,10 +25,17 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             if model.viewMode == .loupe && !model.shots.isEmpty {
-                Filmstrip(model: model)
+                if model.isFilmstripExpanded {
+                    Filmstrip(model: model)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else {
+                    CollapsedFilmstripBar(model: model)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .animation(.easeInOut(duration: 0.18), value: model.isFilmstripExpanded)
         .onContinuousHover { phase in
             switch phase {
             case .active(let location):

@@ -119,6 +119,9 @@ final class AppState {
         case 45: // n: 4-up survey
             if !event.isARepeat { browser.toggleSurvey() }
             return true
+        case 17: // t: collapse / expand filmstrip
+            if !event.isARepeat { browser.toggleFilmstrip() }
+            return true
         case 3: // f: Lightroom-style full screen
             if !event.isARepeat {
                 toggleFullScreen()

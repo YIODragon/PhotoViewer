@@ -63,6 +63,24 @@ struct FilterBar: View {
             Spacer(minLength: 10)
 
             ratingControls
+
+            if model.viewMode == .loupe {
+                Rectangle()
+                    .fill(.secondary.opacity(0.25))
+                    .frame(width: 1, height: 14)
+                    .padding(.horizontal, 2)
+
+                Button {
+                    model.toggleFilmstrip()
+                } label: {
+                    Image(systemName: model.isFilmstripExpanded ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.plain)
+                .help(model.isFilmstripExpanded ? "折叠胶片条（T）" : "展开胶片条（T）")
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)

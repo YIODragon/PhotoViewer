@@ -41,6 +41,7 @@ final class BrowserViewModel {
     private(set) var marks: [String: ShotMark] = [:]
     private(set) var viewMode: ViewMode = .loupe
     private(set) var surveyStartIndex: Int = 0
+    var isFilmstripExpanded = UserDefaults.standard.object(forKey: "filmstripExpanded") as? Bool ?? true
     var showDeleteRejectedConfirmation = false
 
     var error: ViewerError?
@@ -327,6 +328,11 @@ final class BrowserViewModel {
         } else {
             showCompare()
         }
+    }
+
+    func toggleFilmstrip() {
+        isFilmstripExpanded.toggle()
+        UserDefaults.standard.set(isFilmstripExpanded, forKey: "filmstripExpanded")
     }
 
     func showSurvey() {
