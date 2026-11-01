@@ -6,7 +6,7 @@ struct Filmstrip: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollView(.horizontal, showsIndicators: true) {
                 LazyHStack(spacing: 6) {
                     ForEach(Array(model.shots.enumerated()), id: \.element.id) { index, shot in
                         Button {
@@ -38,8 +38,9 @@ struct Filmstrip: View {
                     proxy.scrollTo(id, anchor: .center)
                 }
             }
+            .scrollIndicators(.visible, axes: .horizontal)
         }
-        .frame(height: 72)
+        .frame(height: 88)
         .background(.bar)
         .overlay(alignment: .top) {
             Divider()
