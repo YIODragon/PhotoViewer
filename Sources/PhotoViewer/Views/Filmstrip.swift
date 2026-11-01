@@ -8,6 +8,7 @@ struct Filmstrip: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var viewportWidth: CGFloat = 0
     @State private var isHoveringScrollbar = false
+    @State private var isHoveringCollapseButton = false
 
     var body: some View {
         GeometryReader { outer in
@@ -32,10 +33,10 @@ struct Filmstrip: View {
                             }
                         }
                         .padding(.horizontal, 10)
-                        .padding(.top, 5)
+                        .padding(.top, 14)
                         .padding(.bottom, 2)
                     }
-                    .frame(height: 65)
+                    .frame(height: 74)
                     .onScrollGeometryChange(for: FilmstripScrollMetrics.self) { geometry in
                         FilmstripScrollMetrics(
                             offset: geometry.contentOffset.x,
@@ -65,7 +66,7 @@ struct Filmstrip: View {
                         }
                     }
 
-                    scrollbar(
+                    bottomBar(
                         viewportWidth: viewportWidth > 0 ? viewportWidth : outer.size.width,
                         proxy: proxy
                     )
@@ -73,16 +74,47 @@ struct Filmstrip: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
-        .frame(height: 76)
+        .frame(height: 85)
         .background(.bar)
         .overlay(alignment: .top) {
-            Divider()
+            ZStack(alignment: .top) {
+                Divider()
+
+                Button {
+                    model.toggleFilmstrip()
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(isHoveringCollapseButton ? Color.primary : Color.secondary)
+                        .frame(width: 48, height: 12)
+                        .background(.bar)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    isHoveringCollapseButton = hovering
+                }
+                .help("折叠胶片条（T）")
+            }
         }
     }
 
     @ViewBuilder
-    private func scrollbar(viewportWidth: CGFloat, proxy: ScrollViewProxy) -> some View {
-        let trackWidth = max(0, viewportWidth - 20)
+    private func bottomBar(viewportWidth: CGFloat, proxy: ScrollViewProxy) -> some View {
+        scrollbar(
+            viewportWidth: viewportWidth,
+            trackWidth: max(0, viewportWidth - 20),
+            proxy: proxy
+        )
+        .padding(.horizontal, 10)
+    }
+
+    @ViewBuilder
+    private func scrollbar(
+        viewportWidth: CGFloat,
+        trackWidth: CGFloat,
+        proxy: ScrollViewProxy
+    ) -> some View {
         let overflowing = contentWidth > viewportWidth + 1
 
         if overflowing, !model.shots.isEmpty, trackWidth > 0 {
@@ -119,10 +151,9 @@ struct Filmstrip: View {
                         scroll(to: fraction, proxy: proxy)
                     }
             )
-            .padding(.horizontal, 10)
         } else {
             Color.clear
-                .frame(height: 8)
+                .frame(width: trackWidth, height: 8)
         }
     }
 

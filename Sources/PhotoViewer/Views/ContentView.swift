@@ -14,15 +14,18 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if model.hasAnyShots {
-                FilterBar(model: model)
-            }
+            TopBar(model: model)
 
             ZStack {
                 Color.black
                 content
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contextMenu {
+                if model.currentShot != nil {
+                    currentPhotoMenu
+                }
+            }
 
             if model.viewMode == .loupe && !model.shots.isEmpty {
                 if model.isFilmstripExpanded {
@@ -53,7 +56,6 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.windowTitle)
-        .toolbar { toolbarContent }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
@@ -105,6 +107,108 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openRequestsAvailable)) { _ in
             model.consumeOpenRequests()
         }
+    }
+
+    @ViewBuilder
+    private var currentPhotoMenu: some View {
+        Button {
+            model.goPrevious()
+        } label: {
+            Label("上一张", systemImage: "chevron.left")
+        }
+        .disabled(!model.canGoPrevious || model.isDeleting)
+
+        Button {
+            model.goNext()
+        } label: {
+            Label("下一张", systemImage: "chevron.right")
+        }
+        .disabled(!model.canGoNext || model.isDeleting)
+
+        Divider()
+
+        Menu("评分") {
+            ForEach(0...5, id: \.self) { value in
+                Button {
+                    model.rate(value)
+                } label: {
+                    if value == 0 {
+                        Text("清除星级")
+                    } else {
+                        Text(String(repeating: "★", count: value))
+                    }
+                }
+            }
+        }
+
+        Button {
+            model.toggleFlag(.pick)
+        } label: {
+            Label(
+                model.currentFlag == .pick ? "取消保留" : "保留",
+                systemImage: model.currentFlag == .pick ? "flag.fill" : "flag"
+            )
+        }
+
+        Button {
+            model.toggleFlag(.reject)
+        } label: {
+            Label(
+                model.currentFlag == .reject ? "取消废片" : "标记废片",
+                systemImage: model.currentFlag == .reject ? "xmark.circle.fill" : "xmark.circle"
+            )
+        }
+
+        if model.currentFlag != .none {
+            Button("取消旗标") {
+                model.clearFlag()
+            }
+        }
+
+        Divider()
+
+        Menu("打开方式") {
+            Button("默认应用") {
+                model.openCurrentPhotoWithDefaultApplication()
+            }
+
+            let applications = model.currentPhotoApplications
+            if !applications.isEmpty {
+                Divider()
+                ForEach(applications, id: \.self) { appURL in
+                    Button {
+                        model.openCurrentPhoto(with: appURL)
+                    } label: {
+                        Label {
+                            Text(model.applicationName(for: appURL))
+                        } icon: {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: appURL.path))
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button("选择其他应用…") {
+                model.chooseApplicationForCurrentPhoto()
+            }
+        }
+
+        Button {
+            model.revealCurrentPhotoInFinder()
+        } label: {
+            Label("在 Finder 中显示", systemImage: "folder")
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            model.requestDelete()
+        } label: {
+            Label("移到废纸篓", systemImage: "trash")
+        }
+        .disabled(model.isDeleting)
     }
 
     @ViewBuilder
@@ -172,93 +276,6 @@ struct ContentView: View {
             onOpenImage: model.openPanelForImage,
             onOpenFolder: model.openPanelForFolder
         )
-    }
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            Button {
-                model.openPanelForImage()
-            } label: {
-                Label("打开图片", systemImage: "photo")
-            }
-            .help("打开图片（⌘O）")
-
-            Button {
-                model.openPanelForFolder()
-            } label: {
-                Label("打开文件夹", systemImage: "folder")
-            }
-            .help("打开文件夹（⇧⌘O）")
-
-            Divider()
-
-            Button {
-                model.goPrevious()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .disabled(!model.canGoPrevious)
-            .help("上一张（←）")
-
-            Button {
-                model.goNext()
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-            .disabled(!model.canGoNext)
-            .help("下一张（→）")
-        }
-
-        ToolbarItem(placement: .principal) {
-            HStack(spacing: 7) {
-                Text(model.positionText)
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
-
-                if let pairBadge = model.pairBadge {
-                    Text(pairBadge)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-
-                if model.canToggleFormat {
-                    Button {
-                        model.toggleDisplayFormat()
-                    } label: {
-                        Text(model.formatLabel)
-                            .font(.system(size: 10, weight: .bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .help("切换 RAW / JPEG（J）")
-                } else if !model.formatLabel.isEmpty {
-                    Text(model.formatLabel)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .help(model.currentPhoto?.name ?? "未打开图片")
-        }
-
-        ToolbarItemGroup(placement: .primaryAction) {
-            Button {
-                model.requestDelete()
-            } label: {
-                Image(systemName: "trash")
-            }
-            .disabled(model.currentShot == nil || model.isDeleting)
-            .help("删除整张（NEF+JPG 会一起删除，Delete）")
-
-            Button {
-                AppState.shared.toggleFullScreen()
-            } label: {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-            }
-            .help("全屏（F / ⇧⌘F）")
-        }
     }
 
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {

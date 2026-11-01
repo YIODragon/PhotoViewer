@@ -15,7 +15,6 @@ struct PhotoViewerApp: App {
                 }
         }
         .defaultSize(width: 1200, height: 800)
-        .windowToolbarStyle(.unifiedCompact)
         .commands {
             CommandGroup(replacing: .undoRedo) {
                 Button("撤销删除") {

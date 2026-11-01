@@ -1,12 +1,33 @@
 import AppKit
 import Observation
 import PhotoViewerCore
+import UniformTypeIdentifiers
 
-enum ViewMode: Equatable {
+enum ViewMode: Equatable, CaseIterable, Identifiable, Hashable {
     case loupe
     case grid
     case compare
     case survey
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .loupe: return "单张"
+        case .grid: return "网格"
+        case .compare: return "2-up 对比"
+        case .survey: return "4-up Survey"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .loupe: return "photo"
+        case .grid: return "square.grid.2x2"
+        case .compare: return "rectangle.split.2x1"
+        case .survey: return "rectangle.split.2x2"
+        }
+    }
 }
 
 struct ViewerError: Identifiable, LocalizedError {
@@ -201,6 +222,83 @@ final class BrowserViewModel {
         }
     }
 
+    var currentPhotoApplications: [URL] {
+        guard let url = currentPhoto?.url else { return [] }
+
+        let ownBundle = Bundle.main.bundleURL.standardizedFileURL
+        var seen = Set<String>()
+        let apps = NSWorkspace.shared.urlsForApplications(toOpen: url)
+            .filter { appURL in
+                guard appURL.standardizedFileURL.path != ownBundle.path else { return false }
+                return seen.insert(applicationName(for: appURL).lowercased()).inserted
+            }
+
+        return apps.sorted {
+            applicationName(for: $0).localizedStandardCompare(applicationName(for: $1)) == .orderedAscending
+        }
+    }
+
+    func applicationName(for appURL: URL) -> String {
+        if let bundle = Bundle(url: appURL) {
+            if let name = bundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+               !name.isEmpty {
+                return name
+            }
+            if let name = bundle.object(forInfoDictionaryKey: "CFBundleName") as? String,
+               !name.isEmpty {
+                return name
+            }
+        }
+        return FileManager.default.displayName(atPath: appURL.path)
+            .replacingOccurrences(of: ".app", with: "")
+    }
+
+    func openCurrentPhotoWithDefaultApplication() {
+        guard let url = currentPhoto?.url else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    func openCurrentPhoto(with applicationURL: URL) {
+        guard let url = currentPhoto?.url else { return }
+
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.open(
+            [url],
+            withApplicationAt: applicationURL,
+            configuration: configuration
+        ) { [weak self] _, error in
+            guard let error else { return }
+            Task { @MainActor [weak self] in
+                self?.present(error)
+            }
+        }
+    }
+
+    func chooseApplicationForCurrentPhoto() {
+        guard currentPhoto != nil else { return }
+
+        let panel = NSOpenPanel()
+        panel.title = "选择打开照片的应用"
+        panel.message = "选择用于打开当前照片的应用。"
+        panel.prompt = "打开"
+        panel.allowedContentTypes = [.application]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.treatsFilePackagesAsDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+
+        if panel.runModal() == .OK, let appURL = panel.url {
+            openCurrentPhoto(with: appURL)
+        }
+    }
+
+    func revealCurrentPhotoInFinder() {
+        guard let url = currentPhoto?.url else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
     func open(url: URL) async {
         let url = url.standardizedFileURL
         let isDirectory = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
@@ -330,6 +428,21 @@ final class BrowserViewModel {
         }
     }
 
+    func setViewMode(_ mode: ViewMode) {
+        guard viewMode != mode else { return }
+
+        switch mode {
+        case .loupe:
+            showLoupe()
+        case .grid:
+            viewMode = .grid
+        case .compare:
+            showCompare()
+        case .survey:
+            showSurvey()
+        }
+    }
+
     func toggleFilmstrip() {
         isFilmstripExpanded.toggle()
         UserDefaults.standard.set(isFilmstripExpanded, forKey: "filmstripExpanded")
@@ -395,6 +508,7 @@ final class BrowserViewModel {
 
         mark.rating = value
         store(mark, for: shot)
+        showToast(markFeedback(mark), duration: 1.2)
         afterMarkChange(shotID: shot.id, oldIndex: oldIndex)
     }
 
@@ -410,6 +524,7 @@ final class BrowserViewModel {
 
         mark.flag = flag
         store(mark, for: shot)
+        showToast(markFeedback(mark), duration: 1.2)
         afterMarkChange(shotID: shot.id, oldIndex: oldIndex)
     }
 
@@ -867,11 +982,33 @@ final class BrowserViewModel {
         }
     }
 
-    private func showToast(_ message: String) {
+    private func markFeedback(_ mark: ShotMark) -> String {
+        var parts: [String] = []
+
+        if mark.rating > 0 {
+            parts.append("★\(mark.rating)")
+        }
+
+        switch mark.flag {
+        case .pick:
+            parts.append("保留")
+        case .reject:
+            parts.append("废片")
+        case .none:
+            break
+        }
+
+        if parts.isEmpty {
+            parts.append("未评级")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private func showToast(_ message: String, duration: Double = 2.5) {
         toast = message
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(2.5))
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }

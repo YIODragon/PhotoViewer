@@ -11,6 +11,7 @@ struct ShotThumbnailView: View {
 
     @State private var image: NSImage?
     @State private var failed = false
+    @State private var isHovering = false
 
     var body: some View {
         ZStack {
@@ -48,7 +49,7 @@ struct ShotThumbnailView: View {
                 HStack {
                     if rating > 0 {
                         Text("★\(rating)")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(.yellow)
                             .padding(.horizontal, 3)
                             .padding(.vertical, 1)
@@ -61,14 +62,28 @@ struct ShotThumbnailView: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+        .overlay(alignment: .leading) {
+            if flag != .none {
+                Rectangle()
+                    .fill(flag == .pick ? Color.green : Color.red)
+                    .frame(width: 3)
+                    .padding(.vertical, 3)
+                    .padding(.leading, 1)
+            }
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 4)
                 .strokeBorder(
-                    isSelected ? Color.accentColor : Color.white.opacity(0.08),
+                    isSelected
+                        ? Color.accentColor
+                        : (isHovering ? Color.white.opacity(0.28) : Color.white.opacity(0.08)),
                     lineWidth: isSelected ? 2 : 1
                 )
         }
         .contentShape(Rectangle())
+        .onHover { hovering in
+            isHovering = hovering
+        }
         .task(id: shot.primaryPhoto.url) {
             image = nil
             failed = false
